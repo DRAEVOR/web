@@ -1,252 +1,245 @@
-/**
- * DRAEVOR - ULTRA ADVANCED SCRIPT
- * Handles: Loader, Cursor Physics, Canvas Particles, Scroll Animations
- */
-
+// Wait for DOM
 document.addEventListener('DOMContentLoaded', () => {
     
-    // =========================================
-    // 1. LOADING SEQUENCE
-    // =========================================
-    const loader = document.getElementById('loader');
-    const loaderBar = document.getElementById('loader-bar');
+    // --- 1. PRELOADER LOGIC ---
+    const preloader = document.querySelector('.preloader');
+    const logo = document.querySelector('.loader-logo');
+    const progressBar = document.querySelector('.progress-bar');
     
-    // Simulate complex loading process
-    setTimeout(() => {
-        loaderBar.style.width = '100%';
-    }, 100);
+    // Animate Logo
+    gsap.to(logo, { opacity: 1, duration: 1, ease: "power2.out" });
+    
+    // Simulate Loading
+    gsap.to(progressBar, {
+        width: '100%',
+        duration: 2,
+        ease: "power2.inOut",
+        onComplete: () => {
+            gsap.to(preloader, {
+                y: '-100%',
+                duration: 1,
+                ease: "expo.inOut",
+                delay: 0.5
+            });
+            initSiteAnimations();
+        }
+    });
 
-    setTimeout(() => {
-        loader.style.opacity = '0';
-        setTimeout(() => {
-            loader.style.display = 'none';
-            // Initialize animations after load
-            initScrollAnimations();
-            initTypewriter();
-        }, 1000);
-    }, 2500);
-
-    // =========================================
-    // 2. CUSTOM CURSOR PHYSICS
-    // =========================================
+    // --- 2. CUSTOM CURSOR ---
     const cursorDot = document.querySelector('[data-cursor-dot]');
     const cursorOutline = document.querySelector('[data-cursor-outline]');
-    const cursorGlow = document.querySelector('[data-cursor-glow]');
     
-    // Mouse position state
-    let mouseX = 0;
-    let mouseY = 0;
-    
-    // Outline position state (for lag effect)
-    let outlineX = 0;
-    let outlineY = 0;
-
     window.addEventListener('mousemove', (e) => {
-        mouseX = e.clientX;
-        mouseY = e.clientY;
+        const posX = e.clientX;
+        const posY = e.clientY;
         
-        // Dot moves instantly
-        cursorDot.style.left = `${mouseX}px`;
-        cursorDot.style.top = `${mouseY}px`;
+        // Dot follows instantly
+        cursorDot.style.left = `${posX}px`;
+        cursorDot.style.top = `${posY}px`;
         
-        // Glow moves with slight lag
-        cursorGlow.animate({
-            left: `${mouseX}px`,
-            top: `${mouseY}px`
-        }, { duration: 500, fill: "forwards" });
-    });
-
-    // Smooth outline animation loop
-    function animateCursor() {
-        // Linear interpolation for smooth follow
-        outlineX += (mouseX - outlineX) * 0.15;
-        outlineY += (mouseY - outlineY) * 0.15;
-        
-        cursorOutline.style.left = `${outlineX}px`;
-        cursorOutline.style.top = `${outlineY}px`;
-        
-        requestAnimationFrame(animateCursor);
-    }
-    animateCursor();
-
-    // Hover Effects for Interactive Elements
-    const interactiveElements = document.querySelectorAll('a, button, .glass-panel, .project-card');
-    
-    interactiveElements.forEach(el => {
-        el.addEventListener('mouseenter', () => {
-            document.body.classList.add('hovering');
-        });
-        el.addEventListener('mouseleave', () => {
-            document.body.classList.remove('hovering');
+        // Outline follows with lag (GSAP)
+        gsap.to(cursorOutline, {
+            x: posX,
+            y: posY,
+            duration: 0.15,
+            ease: "power2.out"
         });
     });
 
-    // =========================================
-    // 3. MAGNETIC BUTTONS
-    // =========================================
-    const magneticBtns = document.querySelectorAll('.magnetic-btn');
-    
-    magneticBtns.forEach(btn => {
-        btn.addEventListener('mousemove', (e) => {
-            const rect = btn.getBoundingClientRect();
-            const x = e.clientX - rect.left - rect.width / 2;
-            const y = e.clientY - rect.top - rect.height / 2;
-            
-            // Move button slightly towards cursor
-            btn.style.transform = `translate(${x * 0.3}px, ${y * 0.3}px)`;
-        });
-        
-        btn.addEventListener('mouseleave', () => {
-            btn.style.transform = 'translate(0, 0)';
-        });
+    // Hover Effect for Links/Buttons
+    const hoverables = document.querySelectorAll('a, button, .project-card, .timeline-item');
+    hoverables.forEach(el => {
+        el.addEventListener('mouseenter', () => cursorOutline.classList.add('hovered'));
+        el.addEventListener('mouseleave', () => cursorOutline.classList.remove('hovered'));
     });
 
-    // =========================================
-    // 4. CANVAS PARTICLE NETWORK
-    // =========================================
-    const canvas = document.getElementById('bg-canvas');
-    const ctx = canvas.getContext('2d');
-    
-    let width, height;
-    let particles = [];
-    
-    // Resize handling
-    function resizeCanvas() {
-        width = window.innerWidth;
-        height = window.innerHeight;
-        canvas.width = width;
-        canvas.height = height;
-    }
-    
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-    
-    // Particle Class
-    class Particle {
-        constructor() {
-            this.x = Math.random() * width;
-            this.y = Math.random() * height;
-            this.vx = (Math.random() - 0.5) * 0.5; // Velocity X
-            this.vy = (Math.random() - 0.5) * 0.5; // Velocity Y
-            this.size = Math.random() * 2;
-            this.color = 'rgba(212, 175, 55, 0.5)'; // Gold
+    // --- 3. THREE.JS BACKGROUND ---
+    const initThreeJS = () => {
+        const canvas = document.querySelector('#webgl-canvas');
+        const scene = new THREE.Scene();
+        
+        // Fog for depth
+        scene.fog = new THREE.FogExp2(0x050505, 0.002);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // Particles
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlesCount = 2000;
+        
+        const posArray = new Float32Array(particlesCount * 3);
+        
+        for(let i = 0; i < particlesCount * 3; i++) {
+            // Spread particles wide
+            posArray[i] = (Math.random() - 0.5) * 15; 
         }
         
-        update() {
-            this.x += this.vx;
-            this.y += this.vy;
-            
-            // Bounce off edges
-            if (this.x < 0 || this.x > width) this.vx *= -1;
-            if (this.y < 0 || this.y > height) this.vy *= -1;
-        }
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
         
-        draw() {
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fillStyle = this.color;
-            ctx.fill();
-        }
-    }
-    
-    // Initialize Particles
-    function initParticles() {
-        particles = [];
-        const particleCount = Math.floor(width / 15); // Responsive count
-        for (let i = 0; i < particleCount; i++) {
-            particles.push(new Particle());
-        }
-    }
-    
-    initParticles();
-    
-    // Animation Loop
-    function animateParticles() {
-        ctx.clearRect(0, 0, width, height);
+        const material = new THREE.PointsMaterial({
+            size: 0.02,
+            color: 0xD4AF37, // Gold
+            transparent: true,
+            opacity: 0.8,
+        });
         
-        for (let i = 0; i < particles.length; i++) {
-            particles[i].update();
-            particles[i].draw();
-            
-            // Draw connections
-            for (let j = i; j < particles.length; j++) {
-                const dx = particles[i].x - particles[j].x;
-                const dy = particles[i].y - particles[j].y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < 100) {
-                    ctx.beginPath();
-                    ctx.strokeStyle = `rgba(212, 175, 55, ${0.1 - distance/1000})`;
-                    ctx.lineWidth = 0.5;
-                    ctx.moveTo(particles[i].x, particles[i].y);
-                    ctx.lineTo(particles[j].x, particles[j].y);
-                    ctx.stroke();
-                }
+        const particlesMesh = new THREE.Points(particlesGeometry, material);
+        scene.add(particlesMesh);
+
+        // Grid Floor
+        const gridHelper = new THREE.GridHelper(30, 30, 0xFF003C, 0x222222);
+        gridHelper.position.y = -2;
+        scene.add(gridHelper);
+
+        camera.position.z = 3;
+
+        // Mouse interaction
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        document.addEventListener('mousemove', (event) => {
+            mouseX = event.clientX / window.innerWidth - 0.5;
+            mouseY = event.clientY / window.innerHeight - 0.5;
+        });
+
+        // Animation Loop
+        const clock = new THREE.Clock();
+
+        const animate = () => {
+            const elapsedTime = clock.getElapsedTime();
+
+            // Rotate entire particle system slowly
+            particlesMesh.rotation.y = elapsedTime * 0.05;
+            particlesMesh.rotation.x = mouseY * 0.5;
+            particlesMesh.rotation.y += mouseX * 0.5;
+
+            // Move grid to simulate forward motion
+            gridHelper.position.z = (elapsedTime * 2) % 10;
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        };
+
+        animate();
+
+        // Resize Handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    };
+
+    initThreeJS();
+
+    // --- 4. GSAP SCROLL ANIMATIONS ---
+    gsap.registerPlugin(ScrollTrigger);
+
+    const initSiteAnimations = () => {
+        
+        // Hero Content Stagger
+        const tl = gsap.timeline();
+        
+        tl.to('.hero-label', { opacity: 1, y: 0, duration: 1, ease: "power3.out" })
+          .from('.hero-title .line', { 
+              y: 100, 
+              opacity: 0, 
+              duration: 1, 
+              stagger: 0.2, 
+              ease: "power4.out" 
+          }, "-=0.5")
+          .to('.typewriter-container', { opacity: 1, duration: 0.5 }, "-=0.5")
+          .to('.hero-cta-group', { opacity: 1, y: 0, duration: 0.8, ease: "back.out(1.7)" }, "-=0.5");
+
+        // Typewriter Effect
+        const typeText = "Full Stack Developer | Creative Technologist | UI/UX Designer";
+        const typeContainer = document.querySelector('.typewriter');
+        let i = 0;
+        
+        function typeWriter() {
+            if (i < typeText.length) {
+                typeContainer.innerHTML += typeText.charAt(i);
+                i++;
+                setTimeout(typeWriter, 50);
             }
         }
-        requestAnimationFrame(animateParticles);
-    }
-    
-    animateParticles();
+        setTimeout(typeWriter, 1500); // Start after hero load
 
-    // =========================================
-    // 5. SCROLL ANIMATIONS (INTERSECTION OBSERVER)
-    // =========================================
-    function initScrollAnimations() {
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: "0px 0px -50px 0px"
-        };
+        // Navbar Scroll Effect
+        window.addEventListener('scroll', () => {
+            const nav = document.querySelector('.navbar');
+            if (window.scrollY > 50) {
+                nav.classList.add('scrolled');
+            } else {
+                nav.classList.remove('scrolled');
+            }
+        });
+
+        // Reveal Animations (General)
+        const revealElements = document.querySelectorAll('.reveal-up, .reveal-left, .reveal-right');
         
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('active');
-                    // Optional: Stop observing once animated
-                    // observer.unobserve(entry.target); 
+        revealElements.forEach(el => {
+            gsap.fromTo(el, 
+                { 
+                    opacity: 0, 
+                    y: 50,
+                    x: el.classList.contains('reveal-left') ? -50 : (el.classList.contains('reveal-right') ? 50 : 0)
+                },
+                {
+                    opacity: 1,
+                    y: 0,
+                    x: 0,
+                    duration: 1,
+                    ease: "power3.out",
+                    scrollTrigger: {
+                        trigger: el,
+                        start: "top 85%",
+                        toggleActions: "play none none reverse"
+                    }
+                }
+            );
+        });
+
+        // Stats Counter Animation
+        const counters = document.querySelectorAll('.counter');
+        counters.forEach(counter => {
+            const target = +counter.getAttribute('data-target');
+            
+            gsap.to(counter, {
+                innerHTML: target,
+                duration: 2,
+                snap: { innerHTML: 1 },
+                scrollTrigger: {
+                    trigger: counter,
+                    start: "top 80%",
+                    once: true
                 }
             });
-        }, observerOptions);
-        
-        const revealElements = document.querySelectorAll('.reveal-up, .reveal-left, .reveal-right');
-        revealElements.forEach(el => observer.observe(el));
-    }
+        });
 
-    // =========================================
-    // 6. TYPEWRITER EFFECT
-    // =========================================
-    function initTypewriter() {
-        const textElement = document.getElementById('typewriter');
-        const phrases = [" // Building the Future.", " // Designing Impact.", " // Code is Law."];
-        let phraseIndex = 0;
-        let charIndex = 0;
-        let isDeleting = false;
-        
-        function type() {
-            const currentPhrase = phrases[phraseIndex];
+        // Magnetic Buttons
+        const magneticBtns = document.querySelectorAll('.magnetic-btn');
+        magneticBtns.forEach(btn => {
+            btn.addEventListener('mousemove', (e) => {
+                const rect = btn.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                
+                gsap.to(btn, {
+                    x: x * 0.3,
+                    y: y * 0.3,
+                    duration: 0.3,
+                    ease: "power2.out"
+                });
+            });
             
-            if (isDeleting) {
-                textElement.textContent = currentPhrase.substring(0, charIndex - 1);
-                charIndex--;
-            } else {
-                textElement.textContent = currentPhrase.substring(0, charIndex + 1);
-                charIndex++;
-            }
-            
-            let typeSpeed = isDeleting ? 50 : 100;
-            
-            if (!isDeleting && charIndex === currentPhrase.length) {
-                typeSpeed = 2000; // Pause at end
-                isDeleting = true;
-            } else if (isDeleting && charIndex === 0) {
-                isDeleting = false;
-                phraseIndex = (phraseIndex + 1) % phrases.length;
-                typeSpeed = 500;
-            }
-            
-            setTimeout(type, typeSpeed);
-        }
-        
-        type();
-    }
+            btn.addEventListener('mouseleave', () => {
+                gsap.to(btn, { x: 0, y: 0, duration: 0.3, ease: "elastic.out(1, 0.3)" });
+            });
+        });
+    };
 });
